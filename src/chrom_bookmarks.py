@@ -119,7 +119,7 @@ def path_to_fire_bookmarks() -> str:
     user_dir = os.path.expanduser('~')
     f_home = f"{user_dir}{FIRE_BOOKMARKS}"
     if not os.path.isdir(f_home):
-        return None
+        return ''
     f_home_dirs = [f'{f_home}/{o}' for o in os.listdir(f_home)]
     valid_hist = None
     for f in f_home_dirs:
@@ -128,18 +128,18 @@ def path_to_fire_bookmarks() -> str:
             for fs in f_sub_dirs:
                 if os.path.isfile(fs) and os.path.basename(fs) == 'places.sqlite':
                     valid_hist = fs
+                    #no need to continue loop
+                    return valid_hist
     return valid_hist
 
 
 def load_fire_bookmarks(fire_locked_db: str) -> list:
     """
     Load Firefox History files into list
-
     Args:
         fire_locked_db (list): Contains valid history paths
-
     Returns:
-        list: hitory entries unfiltered
+        list: history entries unfiltered
     """
     fire_history_db = '/tmp/places.sqlite'
     results = list()
@@ -164,10 +164,8 @@ def load_fire_bookmarks(fire_locked_db: str) -> list:
 def get_json_from_file(file: str) -> json:
     """
     Get Bookmark JSON
-
     Args:
         file(str): File path to valid bookmark file
-
     Returns:
         str: JSON of Bookmarks
     """
@@ -175,8 +173,11 @@ def get_json_from_file(file: str) -> json:
 
 
 def match(search_term: str, results: list) -> list:
-    # compress white space
+    # compress white spaces
     search_term = ' '.join(search_term.split())
+
+    # Has OR Filter
+    has_or = "|" in search_term
     search_terms = search_term.split('&') if '&' in search_term else search_term.split(' ')
     n_list = list()
     # s = normalize('NFC', search_terms)
@@ -185,14 +186,13 @@ def match(search_term: str, results: list) -> list:
     for r in results:
         # Take also the url
         t = normalize('NFC', ' '.join(r[0:1]))
-
-        # t = normalize('NFC', r[0]) if r[0] is not None else ''
-        # t += ' ' + normalize('NFC', r[1]) if r[1] is not None else ''
-        # sys.stderr.write('Title: '+t+'\n')
-        # s = normalize('NFC', s) if s is not None else ''
-        # sys.stderr.write("url: " + s + '\n')
-        if all(x in t.lower() for x in s):
-            n_list.append(r)
+        #Support AND/OR filters
+        if has_or:
+            if any(x in t.lower() for x in s):
+                n_list.append(r)
+        else:
+            if all(x in t.lower() for x in s):
+                n_list.append(r)
     return n_list
 
 
