@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 import codecs
 import json
@@ -6,7 +6,7 @@ import os
 import shutil
 import sqlite3
 import sys
-from typing import Union
+from typing import Union, List
 from unicodedata import normalize
 
 from Alfred3 import Items as Items
@@ -29,6 +29,7 @@ FIRE_BOOKMARKS = str()
 BOOKMARKS = list()
 # Get Browser Histories to load per env
 for k in BOOKMARS_MAP.keys():
+    if os.getenv(k, None) is None: continue
     is_set = Tools.getEnvBool(k)
     if k == "firefox" and is_set:
         FIRE_BOOKMARKS = BOOKMARS_MAP.get(k)
@@ -65,25 +66,30 @@ def get_all_urls(the_json: str) -> list:
     Returns:
         list(tuble): List of tublle with Bookmarks url and title
     """
-    def extract_data(data: dict):
+
+    def extract_data(data: dict, folder=None):
         if isinstance(data, dict) and data.get('type') == 'url':
-            urls.append({'name': data.get('name'), 'url': data.get('url')})
+            if folder is None:
+                urls.append({'name': data.get('name'), 'url': data.get('url')})
+            else:
+                urls.append({'name': data.get('name'), 'url': data.get('url'), 'folder': folder})
         if isinstance(data, dict) and data.get('type') == 'folder':
             the_children = data.get('children')
-            get_container(the_children)
+            folder = data.get('name')
+            get_container(the_children, folder)
 
-    def get_container(o: Union[list, dict]):
+    def get_container(o: Union[list, dict], folder=None):
         if isinstance(o, list):
             for i in o:
-                extract_data(i)
+                extract_data(i, folder)
         if isinstance(o, dict):
             for k, i in o.items():
-                extract_data(i)
+                extract_data(i, folder)
 
     urls = list()
     get_container(the_json)
     s_list_dict = sorted(urls, key=lambda k: k['name'], reverse=False)
-    ret_list = [(l.get('name'), l.get('url')) for l in s_list_dict]
+    ret_list = [(l.get('name'), l.get('url'),l.get('folder')) for l in s_list_dict]
     return ret_list
 
 
@@ -169,17 +175,24 @@ def get_json_from_file(file: str) -> json:
 
 
 def match(search_term: str, results: list) -> list:
+    # compress white space
+    search_term = ' '.join(search_term.split())
     search_terms = search_term.split('&') if '&' in search_term else search_term.split(' ')
-    for s in search_terms:
-        n_list = list()
-        s = normalize('NFC', s)
-        for r in results:
-            t = normalize('NFC', r[0]) if r[0] is not None else ''
-            # sys.stderr.write('Title: '+t+'\n')
-            s = normalize('NFC', s) if s is not None else ''
-            # sys.stderr.write("url: " + s + '\n')
-            if s.lower() in t.lower():
-                n_list.append(r)
+    n_list = list()
+    # s = normalize('NFC', search_terms)
+
+    s: List[str] = [normalize('NFC', s.lower()) for s in search_terms]
+    for r in results:
+        # Take also the url
+        t = normalize('NFC', ' '.join(r[0:1]))
+
+        # t = normalize('NFC', r[0]) if r[0] is not None else ''
+        # t += ' ' + normalize('NFC', r[1]) if r[1] is not None else ''
+        # sys.stderr.write('Title: '+t+'\n')
+        # s = normalize('NFC', s) if s is not None else ''
+        # sys.stderr.write("url: " + s + '\n')
+        if all(x in t.lower() for x in s):
+            n_list.append(r)
     return n_list
 
 
@@ -214,9 +227,10 @@ if len(bms) > 0:
         for m in matches:
             name = m[0]
             url = m[1]
+            folder = f"[{m[2]}] " if len(m) == 3 else ""
             wf.setItem(
-                title=name,
-                subtitle=url,
+                title= name,
+                subtitle=folder + url,
                 arg=url,
                 quicklookurl=url
             )
