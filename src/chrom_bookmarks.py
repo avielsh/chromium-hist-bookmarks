@@ -70,9 +70,10 @@ def get_all_urls(the_json: str) -> list:
     def extract_data(data: dict, folder=None):
         if isinstance(data, dict) and data.get('type') == 'url':
             if folder is None:
-                urls.append({'name': data.get('name'), 'url': data.get('url')})
+                urls.append({'name': data.get('name'), 'url': data.get('url'), 'date_added': data.get('date_added')})
             else:
-                urls.append({'name': data.get('name'), 'url': data.get('url'), 'folder': folder})
+                urls.append({'name': data.get('name'), 'url': data.get('url'), 'date_added': data.get('date_added'),
+                             'folder': folder})
         if isinstance(data, dict) and data.get('type') == 'folder':
             the_children = data.get('children')
             folder = data.get('name')
@@ -88,8 +89,8 @@ def get_all_urls(the_json: str) -> list:
 
     urls = list()
     get_container(the_json)
-    s_list_dict = sorted(urls, key=lambda k: k['name'], reverse=False)
-    ret_list = [(l.get('name'), l.get('url'),l.get('folder')) for l in s_list_dict]
+    s_list_dict = sorted(urls, key=lambda k: k['date_added'], reverse=True)
+    ret_list = [(l.get('name'), l.get('url'), l.get('folder')) for l in s_list_dict]
     return ret_list
 
 
@@ -128,7 +129,7 @@ def path_to_fire_bookmarks() -> str:
             for fs in f_sub_dirs:
                 if os.path.isfile(fs) and os.path.basename(fs) == 'places.sqlite':
                     valid_hist = fs
-                    #no need to continue loop
+                    # no need to continue loop
                     return valid_hist
     return valid_hist
 
@@ -185,8 +186,10 @@ def match(search_term: str, results: list) -> list:
     s: List[str] = [normalize('NFC', s.lower()) for s in search_terms]
     for r in results:
         # Take also the url
-        t = normalize('NFC', ' '.join(r[0:1]))
-        #Support AND/OR filters
+        # t = ' '.join(r[0:1]) if len(r) < 3 else ' '.join(r[0:2])
+        t = ' '.join(r)
+        t = normalize('NFC', t)
+        # Support AND/OR filters
         if has_or:
             if any(x in t.lower() for x in s):
                 n_list.append(r)
@@ -229,7 +232,7 @@ if len(bms) > 0:
             url = m[1]
             folder = f"[{m[2]}] " if len(m) == 3 else ""
             wf.setItem(
-                title= name,
+                title=name,
                 subtitle=folder + url,
                 arg=url,
                 quicklookurl=url
